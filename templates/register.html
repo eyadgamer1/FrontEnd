@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureShare - Register</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <h2>Create Account</h2>
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="fullName">Full Name</label>
+                    <input type="text" id="fullName" name="fullName" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="password-input-container">
+                        <input type="password" id="password" name="password" required>
+                        <i class="password-toggle fa fa-eye-slash" data-for="password"></i>
+                    </div>
+                    <div class="password-strength-meter">
+                        <div class="strength-bar"></div>
+                    </div>
+                    <div class="password-requirements">
+                        <p>Password must contain:</p>
+                        <ul>
+                            <li id="length-check">At least 8 characters</li>
+                            <li id="uppercase-check">At least one uppercase letter</li>
+                            <li id="lowercase-check">At least one lowercase letter</li>
+                            <li id="number-check">At least one number</li>
+                            <li id="special-check">At least one special character</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <div class="password-input-container">
+                        <input type="password" id="confirmPassword" name="confirmPassword" required>
+                        <i class="password-toggle fa fa-eye-slash" data-for="confirmPassword"></i>
+                    </div>
+                    <div id="password-match" class="password-match"></div>
+                </div>
+                <button type="submit" class="btn" id="registerButton" disabled>Register</button>
+                <div id="registerStatus" class="status-message"></div>
+            </form>
+            <p style="text-align: center; margin-top: 1rem;">
+                Already have an account? <a href="index.html" style="color: var(--primary);">Login</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Password visibility toggle
+        document.querySelectorAll('.password-toggle').forEach(toggle => {
+            toggle.addEventListener('click', function () {
+                const passwordField = document.getElementById(this.getAttribute('data-for'));
+                const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordField.setAttribute('type', type);
+                this.classList.toggle('fa-eye');
+                this.classList.toggle('fa-eye-slash');
+            });
+        });
+
+        // Password strength checker
+        const passwordInput = document.getElementById('password');
+        const strengthBar = document.querySelector('.strength-bar');
+        const lengthCheck = document.getElementById('length-check');
+        const uppercaseCheck = document.getElementById('uppercase-check');
+        const lowercaseCheck = document.getElementById('lowercase-check');
+        const numberCheck = document.getElementById('number-check');
+        const specialCheck = document.getElementById('special-check');
+        const confirmPasswordInput = document.getElementById('confirmPassword');
+        const passwordMatch = document.getElementById('password-match');
+        const registerButton = document.getElementById('registerButton');
+
+        function checkPasswordStrength() {
+            const password = passwordInput.value;
+            let strength = 0;
+
+            // Reset all checks
+            [lengthCheck, uppercaseCheck, lowercaseCheck, numberCheck, specialCheck].forEach(check => {
+                check.classList.remove('valid');
+                check.classList.remove('invalid');
+            });
+
+            // Check length
+            if (password.length >= 8) {
+                strength += 20;
+                lengthCheck.classList.add('valid');
+            } else {
+                lengthCheck.classList.add('invalid');
+            }
+
+            // Check for uppercase letters
+            if (/[A-Z]/.test(password)) {
+                strength += 20;
+                uppercaseCheck.classList.add('valid');
+            } else {
+                uppercaseCheck.classList.add('invalid');
+            }
+
+            // Check for lowercase letters
+            if (/[a-z]/.test(password)) {
+                strength += 20;
+                lowercaseCheck.classList.add('valid');
+            } else {
+                lowercaseCheck.classList.add('invalid');
+            }
+
+            // Check for numbers
+            if (/[0-9]/.test(password)) {
+                strength += 20;
+                numberCheck.classList.add('valid');
+            } else {
+                numberCheck.classList.add('invalid');
+            }
+
+            // Check for special characters
+            if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+                strength += 20;
+                specialCheck.classList.add('valid');
+            } else {
+                specialCheck.classList.add('invalid');
+            }
+
+            // Update strength bar
+            strengthBar.style.width = `${strength}%`;
+
+            // Set color based on strength
+            if (strength <= 40) {
+                strengthBar.style.backgroundColor = '#ff4d4d'; // Red for weak
+            } else if (strength <= 80) {
+                strengthBar.style.backgroundColor = '#ffaa00'; // Orange for medium
+            } else {
+                strengthBar.style.backgroundColor = '#2ecc71'; // Green for strong
+            }
+
+            // Check if passwords match
+            checkPasswordMatch();
+
+            // Enable/disable register button
+            updateRegisterButton();
+        }
+
+        function checkPasswordMatch() {
+            if (confirmPasswordInput.value === '') {
+                passwordMatch.textContent = '';
+                return;
+            }
+
+            if (passwordInput.value === confirmPasswordInput.value) {
+                passwordMatch.textContent = 'Passwords match';
+                passwordMatch.style.color = '#2ecc71';
+            } else {
+                passwordMatch.textContent = 'Passwords do not match';
+                passwordMatch.style.color = '#ff4d4d';
+            }
+
+            updateRegisterButton();
+        }
+
+        function updateRegisterButton() {
+            // Get all valid checks
+            const allChecksValid = [lengthCheck, uppercaseCheck, lowercaseCheck, numberCheck, specialCheck]
+                .every(check => check.classList.contains('valid'));
+
+            // Check if passwords match
+            const passwordsMatch = passwordInput.value === confirmPasswordInput.value && confirmPasswordInput.value !== '';
+
+            // Check if email is valid
+            const emailInput = document.getElementById('email');
+            const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value);
+
+            // Check if name is provided
+            const nameInput = document.getElementById('fullName');
+            const nameValid = nameInput.value.trim() !== '';
+
+            // Enable button only if all conditions are met
+            registerButton.disabled = !(allChecksValid && passwordsMatch && emailValid && nameValid);
+        }
+
+        passwordInput.addEventListener('input', checkPasswordStrength);
+        confirmPasswordInput.addEventListener('input', checkPasswordMatch);
+        document.getElementById('email').addEventListener('input', updateRegisterButton);
+        document.getElementById('fullName').addEventListener('input', updateRegisterButton);
+
+        // Form submission
+        document.getElementById('registerForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const registerStatus = document.getElementById('registerStatus');
+            registerStatus.textContent = 'Registering...';
+            registerButton.disabled = true;
+
+            const formData = {
+                fullName: document.getElementById('fullName').value,
+                email: document.getElementById('email').value,
+                password: document.getElementById('password').value,
+                confirmPassword: document.getElementById('confirmPassword').value
+            };
+
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    registerStatus.textContent = 'Registration successful! Redirecting to login...';
+                    registerStatus.style.color = '#2ecc71';
+
+                    // Redirect to login page after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 2000);
+                } else {
+                    registerStatus.textContent = data.message || 'Registration failed. Please try again.';
+                    registerStatus.style.color = '#ff4d4d';
+                    registerButton.disabled = false;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                registerStatus.textContent = 'An error occurred. Please try again later.';
+                registerStatus.style.color = '#ff4d4d';
+                registerButton.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>
