@@ -1,70 +1,109 @@
-import mysql.connector
-from mysql.connector import Error
+from flask import Flask, render_template, redirect, url_for, session, flash
+from flask_wtf import FlaskForm
+from wtforms import StringField,PasswordField,SubmitField
+from wtforms.validators import DataRequired, Email, ValidationError
+import bcrypt
+from flask_mysqldb import MySQL
 
-def test_connection():
-    # Database configuration
-    db_config = {
-        'host': 'localhost',
-        'user': 'root',  # Replace with your actual MySQL username
-        'password': 'root',  # Replace with your actual MySQL password
-        'database': 'my_schema'
-    }
-    
-    try:
-        # Attempt to establish connection
-        conn = mysql.connector.connect(**db_config)
-        
-        if conn.is_connected():
-            print("=== Database Connection Test ===")
-            print("✅ Successfully connected to MySQL database!")
-            db_info = conn.get_server_info()
-            print(f"MySQL Server Version: {db_info}")
-            
-            # Test creating a cursor
-            cursor = conn.cursor()
-            print("✅ Successfully created cursor")
-            
-            # Get database information
-            cursor.execute("SELECT DATABASE();")
-            database_name = cursor.fetchone()[0]
-            print(f"Connected to database: {database_name}")
+app = Flask(__name__)
 
-            # Insert test data
-            try:
-                insert_query = """
-                INSERT INTO users (fullName, email, hashed_password) 
-                VALUES (%s, %s, %s);
-                """
-                user_data =    ("Alice Smith", "alice@example.com", "hashed_password_alice")
-                cursor.execute(insert_query, user_data)
-                conn.commit()
-                print("✅ Test data inserted successfully")
-            except Error as insert_error:
-                print(f"❌ Error inserting data: {insert_error}")
-            
-            # Fetch and print the inserted data
-            try:
-                cursor.execute("SELECT * FROM users;")
-                rows = cursor.fetchall()
-                print("=== Users Table Data ===")
-                for row in rows:
-                    print(row)
-                print("========================")
-            except Error as select_error:
-                print(f"❌ Error fetching data: {select_error}")
+# MySQL Configuration
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'
+app.config['MYSQL_PASSWORD'] = 'root'
+app.config['MYSQL_DB'] = 'my_schema'
+app.secret_key = 'your_secret_key_here'
 
-            # Close cursor and connection
-            cursor.close()
-            conn.close()
-            print("✅ Connection closed properly")
-            print("============================")
-            return True
-            
-    except Error as e:
-        print("=== Database Connection Test ===")
-        print(f"❌ Error connecting to MySQL: {e}")
-        print("============================")
-        return False
+mysql = MySQL(app)
 
-if __name__ == "__main__":
-    test_connection()
+class RegisterForm(FlaskForm):
+    name = StringField("Name",validators=[DataRequired()])
+    email = StringField("Email",validators=[DataRequired(), Email()])
+    password = PasswordField("Password",validators=[DataRequired()])
+    submit = SubmitField("Register")
+
+    def validate_email(self,field):
+        cursor = mysql.connection.cursor()
+        cursor.execute("SELECT * FROM users where email=%s",(field.data,))
+        user = cursor.fetchone()
+        cursor.close()
+        if user:
+            raise ValidationError('Email Already Taken')
+
+class LoginForm(FlaskForm):
+    email = StringField("Email",validators=[DataRequired(), Email()])
+    password = PasswordField("Password",validators=[DataRequired()])
+    submit = SubmitField("Login")
+
+
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/register',methods=['GET','POST'])
+def register():
+    form = RegisterForm()
+    if form.validate_on_submit():
+        name = form.name.data
+        email = form.email.data
+        password = form.password.data
+
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'),bcrypt.gensalt())
+
+        # store data into database 
+        cursor = mysql.connection.cursor()
+        cursor.execute("INSERT INTO users (fullName,email,hashed_password) VALUES (%s,%s,%s)",(name,email,hashed_password))
+        mysql.connection.commit()
+        cursor.close()
+
+        return redirect(url_for('login'))
+
+    return render_template('register.html',form=form)
+
+@app.route('/login',methods=['GET','POST'])
+def login():
+    form = LoginForm()
+    if form.validate_on_submit():
+        email = form.email.data
+        password = form.password.data
+
+        cursor = mysql.connection.cursor()
+        cursor.execute("SELECT * FROM users WHERE email=%s",(email,))
+        user = cursor.fetchone()
+        cursor.close()
+        if user and bcrypt.checkpw(password.encode('utf-8'), user[3].encode('utf-8')):
+            session['user_id'] = user[0]
+            return redirect(url_for('home'))
+        else:
+            flash("Login failed. Please check your email and password")
+            return redirect(url_for('login'))
+
+    return render_template('login.html',form=form)
+
+@app.route('/home')
+def home():
+    if 'user_id' in session:
+        user_id = session['user_id']
+
+        cursor = mysql.connection.cursor()
+        cursor.execute("SELECT * FROM users where id=%s",(user_id,))
+        user = cursor.fetchone()
+        cursor.close()
+
+        if user:
+            return render_template('home.html',user=user)
+            
+    return redirect(url_for('login'))
+
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    flash("You have been logged out successfully.")
+    return redirect(url_for('login'))
+
+
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
